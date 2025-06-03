@@ -300,7 +300,7 @@ t_spon = Constant(0.4)
 t_vent = Constant(0.3)
 
 # Compute average E for normalization
-E_bar = t_fib * E_fib + t_spon * E_spon + t_vent * E_vent
+E_avg = t_fib * E_fib + t_spon * E_spon + t_vent * E_vent
 
 # Define position-dependent stiffness function
 y_coord = Expression('x[1]', degree=1)
@@ -313,7 +313,7 @@ E_base_edge = Expression('(1.0 - b) * Eb + b * Ee', degree=1,
                          Eb=E_base, Ee=E_edge, b=blend)
 
 # Scale the interpolated modulus based on how much each anatomical layer contributes
-layer_weight = (t_fib * E_fib + t_spon * E_spon + t_vent * E_vent) / E_bar
+layer_weight = (t_fib * E_fib + t_spon * E_spon + t_vent * E_vent) / E_avg
 
 # Define stiffness field as a weighted linear profile along base-edge axis
 E_expr = Expression('E_be * layer_w',
