@@ -306,16 +306,16 @@ E_avg = t_fib * E_fib + t_spon * E_spon + t_vent * E_vent
 y_coord = Expression('x[1]', degree=1)
 
 # Compute a normalized position along the leaflet from base to free edge
-blend = Expression('(x[1] - y_min) / (y_max - y_min)', degree=1,
+blend = Expression('(y_coord - y_min) / (y_max - y_min)', degree=1,
                    y_min=y_min, y_max=y_max)
-# Defines E at each point in y-axis by linearly interpolating between base and edge stiffness
+# Define E at each point in y-axis by linearly interpolating between base and edge stiffness
 E_base_edge = Expression('(1.0 - b) * Eb + b * Ee', degree=1,
                          Eb=E_base, Ee=E_edge, b=blend)
 
 # Scale the interpolated modulus based on how much each anatomical layer contributes
 layer_weight = (t_fib * E_fib + t_spon * E_spon + t_vent * E_vent) / E_avg
 
-# Define stiffness field as a weighted linear profile along base-edge axis
+# Define stiffness field as a layer weighted linear profile along base-edge axis
 E_expr = Expression('E_be * layer_w',
                     E_be=E_base_edge,
                     layer_w=layer_weight,
