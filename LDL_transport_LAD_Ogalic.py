@@ -271,10 +271,32 @@ b2 = 14.75
 c1 = 0.307 # [cells]
 c2 = 0.805
 
-#************ Vesicular Permeability (P-v) **************
-P_v_space = Function(Q)
-P_v = 1.92e-9 # [cm/s]
-P_v_space = interpolate(Constant(P_v), Q)
+#************ OLD: Vesicular Permeability (P-v) **************
+# P_v_space = Function(Q)
+# P_v = 1.92e-9 # [cm/s]
+# P_v_space = interpolate(Constant(P_v), Q)
+
+
+#************ NEW: Vesicular Permeability (P-v) **************
+
+# Base permeability [cm/s]
+P_0 = 1.92e-9
+
+# Stiffness range [Pa] based on literature
+E_min = 0.1e6
+E_max = 1.5e6
+alpha_sp = 1e-6  # sensitivity parameter to stiffness, tuned to fit scale
+max_y = 1.0
+
+# Define stiffness field as a linear increase along y-axis
+E_expr = Expression("E_min + (E_max - E_min) * x[1] / max_y", degree=1,
+                    E_min=E_min, E_max=E_max, max_y=max_y)
+E_space = interpolate(E_expr, Q)
+
+# Compute spatially varying P_v
+P_v_expr = P_0 * exp(-alpha_sp * E_space)
+P_v_space = project(P_v_expr, Q)
+
 #**************** Biological Properties *****************
 R_cell = 15e-4 # [cm]: Radius of endothelial cell
 w = 14e-7 # [cm]: Half width of leaky junction
