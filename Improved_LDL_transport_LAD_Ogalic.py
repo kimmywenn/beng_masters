@@ -276,21 +276,50 @@ c2 = 0.805
 # P_v = 1.92e-9 # [cm/s]
 # P_v_space = interpolate(Constant(P_v), Q)
 
-
 #************ NEW: Vesicular Permeability (P-v) **************
-
 # Base permeability [cm/s]
 P_0 = 1.92e-9
 
-# Stiffness range [Pa] based on literature
-E_min = 0.1e6
-E_max = 1.5e6
+# Tunable parameters 
+y_min = 0.0                  # Adjust based on your leaflet domain
+y_max = 1.0                  # Adjust based on your leaflet domain
 alpha_sp = 1e-6  # sensitivity parameter to stiffness, tuned to fit scale
-max_y = 1.0
 
-# Define stiffness field as a linear increase along y-axis
-E_expr = Expression("E_min + (E_max - E_min) * x[1] / max_y", degree=1,
-                    E_min=E_min, E_max=E_max, max_y=max_y)
+# Axial stiffness (from ref: insert here)
+E_base = Constant(1e5)       # Young's modulus at base
+E_edge = Constant(5e5)       # Young's modulus at free edge
+
+# Layer stiffnesses (from ref: insert here)
+E_fib = Constant(1.0)
+E_spon = Constant(0.1)
+E_vent = Constant(0.5)
+
+# Layer thickness fractions (from ref: insert here)
+t_fib = Constant(0.3)
+t_spon = Constant(0.4)
+t_vent = Constant(0.3)
+
+# Compute average E for normalization
+E_bar = t_fib * E_fib + t_spon * E_spon + t_vent * E_vent
+
+# Define position-dependent stiffness function
+y_coord = Expression('x[1]', degree=1)
+
+# Compute a normalized position along the leaflet from base to free edge
+blend = Expression('(x[1] - y_min) / (y_max - y_min)', degree=1,
+                   y_min=y_min, y_max=y_max)
+# Defines E at each point in y-axis by linearly interpolating between base and edge stiffness
+E_base_edge = Expression('(1.0 - b) * Eb + b * Ee', degree=1,
+                         Eb=E_base, Ee=E_edge, b=blend)
+
+# Scale the interpolated modulus based on how much each anatomical layer contributes
+layer_weight = (t_fib * E_fib + t_spon * E_spon + t_vent * E_vent) / E_bar
+
+# Define stiffness field as a weighted linear profile along base-edge axis
+E_expr = Expression('E_be * layer_w',
+                    E_be=E_base_edge,
+                    layer_w=layer_weight,
+                    degree=2)
 E_space = interpolate(E_expr, Q)
 
 # Compute spatially varying P_v
