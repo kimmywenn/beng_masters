@@ -278,55 +278,59 @@ c2 = 0.805
 
 #************ NEW: Vesicular Permeability (P-v) **************
 # Base permeability [cm/s]
-P_0 = 1.92e-9
+P_v = 1.92e-9
 
-# Tunable parameters 
-t_avs_leaflet = 0.5
-y_min = 0.0                  
-y_max = t_avs_leaflet                  # Adjust based on your leaflet thickness
-k = 1e-6  		     # sensitivity parameter to stiffness, tuned to fit scale
+# Geometry of semi circular valve leaflet
+t_avs_leaflet = 0.0694		# Adjust based on thickness of leaflet (cm) (in this case, stenosed leaflet)
+v_radius = 1.0			# measured from lab samples (cm)
+
+# Tunable parameters 		
+r_min = 0.0                  
+r_max = v_radius                     # Adjust based on your leaflet  base-edge length (cm) (also equal to radius of human aorta)
+k = 1e-6  		     	# sensitivity parameter to stiffness, tuned to fit scale of P_v
 
 # Parametrizing the fractional layer thicknesses
-f_fib = 0.3  # Fraction of fibrosa layer
-f_vent = 0.3  # Fraction of ventricularis layer
-f_spong = 1.0 - f_fib - f_vent  # Fraction of spongiosa layer
+f_fib = 0.44  # Fraction of fibrosa layer
+f_vent = 0.25  # Fraction of ventricularis layer
+f_spong = 1 - f_fib - f_vent  # Fraction of spongiosa layer
 
-# Layer thicknesses based on fractions
-z_fibrosa = f_fib * t_avs_leaflet
+# Layer depth based on fractions (z-value when layer ends)
 z_ventricularis = f_vent * t_avs_leaflet
-z_spongiosa = f_spong * t_avs_leaflet
+z_spongiosa = f_spong * t_avs_leaflet + z_ventricularis
 
-# Stiffness values (Young's modulus) in MPa
-E_base   = 0.5    # annular (base) region
-E_free   = 2.0    # free edge
-E_vent   = 1.0    # ventricularis layer
-E_spong  = 0.05   # spongiosa layer
-E_fib    = 5.0    # fibrosa layer
+# Stiffness values (Young's modulus) in kPa
+E_base   = 150    # annular (base) region
+E_free   = 42.6    # free edge
+E_vent   = 26.9    # ventricularis layer
+E_spong  = 15.4   # spongiosa layer
+E_fib    = 37.1    # fibrosa layer
 
 # Apply exponential decay formula
-P_base  = P_0 * np.exp(-k * E_base)
-P_free  = P_0 * np.exp(-k * E_free)
-P_ventricularis  = P_0 * np.exp(-k * E_vent)
-P_spongiosa = P_0 * np.exp(-k * E_spong)
-P_fibrosa   = P_0 * np.exp(-k * E_fib)
+P_base  = P_v * np.exp(-k * E_base)
+P_free  = P_v * np.exp(-k * E_free)
+P_ventricularis  = P_v * np.exp(-k * E_vent)
+P_spongiosa = P_v * np.exp(-k * E_spong)
+P_fibrosa   = P_v * np.exp(-k * E_fib)
 
 class P_v_3D(UserExpression):
     def eval(self, value, x):
-        # XY gradient from base (low y) to free edge (high y)
-        p_xy = P_base + (P_free - P_base) * (x[1] - y_min) / (y_max - y_min)
-        
-        # Z direction by layer (assuming known Z-depths)
-        if x[2] < z_ventricularis:
-            p_z = P_ventricularis
-        elif x[2] < z_spongiosa:
-            p_z = P_spongiosa
-        else:
-            p_z = P_fibrosa
-        
-        value[0] = p_xy * p_z
+    # Radial distance from center of semicircular leaflet
+    r = np.sqrt(x[0]**2 + x[1]**2)
+    r_clamped = np.clip(r, r_min, r_max)
 
-    def value_shape(self):
-        return ()
+    # Radial gradient from base to free edge
+    p_r = P_base + (P_free - P_base) * (r_clamped - r_min) / (r_max - r_min)
+
+    # Z-direction by layer
+    if x[2] < z_ventricularis:
+        p_z = P_ventricularis
+    elif x[2] < z_spongiosa:
+        p_z = P_spongiosa
+    else:
+        p_z = P_fibrosa
+
+    # Combined permeability
+    value[0] = p_r * p_z
 
 # Compute spatially varying P_v
 P_v_expr = P_v_3D(degree=1)
