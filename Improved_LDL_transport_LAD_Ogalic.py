@@ -281,50 +281,56 @@ c2 = 0.805
 P_0 = 1.92e-9
 
 # Tunable parameters 
-y_min = 0.0                  # Adjust based on your leaflet domain
-y_max = 1.0                  # Adjust based on your leaflet domain
-alpha_sp = 1e-6  # sensitivity parameter to stiffness, tuned to fit scale
+t_avs_leaflet = 0.5
+y_min = 0.0                  
+y_max = t_avs_leaflet                  # Adjust based on your leaflet thickness
+k = 1e-6  		     # sensitivity parameter to stiffness, tuned to fit scale
 
-# Axial stiffness (from ref: insert here)
-E_base = Constant(1e5)       # Young's modulus at base
-E_edge = Constant(5e5)       # Young's modulus at free edge
+# Parametrizing the fractional layer thicknesses
+f_fib = 0.3  # Fraction of fibrosa layer
+f_vent = 0.3  # Fraction of ventricularis layer
+f_spong = 1.0 - f_fib - f_vent  # Fraction of spongiosa layer
 
-# Layer stiffnesses (from ref: insert here)
-E_fib = Constant(1.0)
-E_spon = Constant(0.1)
-E_vent = Constant(0.5)
+# Layer thicknesses based on fractions
+z_fibrosa = f_fib * t_avs_leaflet
+z_ventricularis = f_vent * t_avs_leaflet
+z_spongiosa = f_spong * t_avs_leaflet
 
-# Layer thickness fractions (from ref: insert here)
-t_fib = Constant(0.3)
-t_spon = Constant(0.4)
-t_vent = Constant(0.3)
+# Stiffness values (Young's modulus) in MPa
+E_base   = 0.5    # annular (base) region
+E_free   = 2.0    # free edge
+E_vent   = 1.0    # ventricularis layer
+E_spong  = 0.05   # spongiosa layer
+E_fib    = 5.0    # fibrosa layer
 
-# Compute average E for normalization
-E_avg = t_fib * E_fib + t_spon * E_spon + t_vent * E_vent
+# Apply exponential decay formula
+P_base  = P_0 * np.exp(-k * E_base)
+P_free  = P_0 * np.exp(-k * E_free)
+P_ventricularis  = P_0 * np.exp(-k * E_vent)
+P_spongiosa = P_0 * np.exp(-k * E_spong)
+P_fibrosa   = P_0 * np.exp(-k * E_fib)
 
-# Define position-dependent stiffness function
-y_coord = Expression('x[1]', degree=1)
+class P_v_3D(UserExpression):
+    def eval(self, value, x):
+        # XY gradient from base (low y) to free edge (high y)
+        p_xy = P_base + (P_free - P_base) * (x[1] - y_min) / (y_max - y_min)
+        
+        # Z direction by layer (assuming known Z-depths)
+        if x[2] < z_ventricularis:
+            p_z = P_ventricularis
+        elif x[2] < z_spongiosa:
+            p_z = P_spongiosa
+        else:
+            p_z = P_fibrosa
+        
+        value[0] = p_xy * p_z
 
-# Compute a normalized position along the leaflet from base to free edge
-blend = Expression('(y_coord - y_min) / (y_max - y_min)', degree=1,
-                   y_min=y_min, y_max=y_max)
-# Define E at each point in y-axis by linearly interpolating between base and edge stiffness
-E_base_edge = Expression('(1.0 - b) * Eb + b * Ee', degree=1,
-                         Eb=E_base, Ee=E_edge, b=blend)
-
-# Scale the interpolated modulus based on how much each anatomical layer contributes
-layer_weight = (t_fib * E_fib + t_spon * E_spon + t_vent * E_vent) / E_avg
-
-# Define stiffness field as a layer weighted linear profile along base-edge axis
-E_expr = Expression('E_be * layer_w',
-                    E_be=E_base_edge,
-                    layer_w=layer_weight,
-                    degree=2)
-E_space = interpolate(E_expr, Q)
+    def value_shape(self):
+        return ()
 
 # Compute spatially varying P_v
-P_v_expr = P_0 * exp(-alpha_sp * E_space)
-P_v_space = project(P_v_expr, Q)
+P_v_expr = P_v_3D(degree=1)
+P_v_space = interpolate(P_v_expr, Q)
 
 #**************** Biological Properties *****************
 R_cell = 15e-4 # [cm]: Radius of endothelial cell
