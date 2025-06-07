@@ -319,7 +319,7 @@ class P_v_3D(UserExpression):
     r_clamped = np.clip(r, r_min, r_max)
 
     # Radial gradient from base to free edge
-    p_r = P_base + (P_free - P_base) * (r_clamped - r_min) / (r_max - r_min)
+    p_r = P_free + (P_base - P_free) * (r_clamped - r_min) / (r_max - r_min)
 
     # Z-direction by layer
     if x[2] < z_ventricularis:
