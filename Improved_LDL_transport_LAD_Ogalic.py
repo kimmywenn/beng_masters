@@ -281,13 +281,13 @@ c2 = 0.805
 P_v = 1.92e-9
 
 # Geometry of semi circular valve leaflet
-t_avs_leaflet = 0.0694		# Adjust based on thickness of leaflet (cm) (in this case, stenosed leaflet)
+t_leaflet = 0.0694		# Adjust based on thickness of leaflet (cm) (in this case, stenosed leaflet)
 v_radius = 1.0			# measured from lab samples (cm)
 
 # Tunable parameters 		
 r_min = 0.0                  
 r_max = v_radius                     # Adjust based on your leaflet  base-edge length (cm) (also equal to radius of human aorta)
-k = 1e-6  		     	# sensitivity parameter to stiffness, tuned to fit scale of P_v
+k = 1e-4  		     	# sensitivity parameter to stiffness, tuned to fit scale of P_v
 
 # Parametrizing the fractional layer thicknesses
 f_fib = 0.44  # Fraction of fibrosa layer
@@ -295,8 +295,8 @@ f_vent = 0.25  # Fraction of ventricularis layer
 f_spong = 1 - f_fib - f_vent  # Fraction of spongiosa layer
 
 # Layer depth based on fractions (z-value when layer ends)
-z_ventricularis = f_vent * t_avs_leaflet
-z_spongiosa = f_spong * t_avs_leaflet + z_ventricularis
+z_ventricularis = f_vent * t_leaflet
+z_spongiosa = f_spong * t_leaflet + z_ventricularis
 
 # Stiffness values (Young's modulus) in kPa
 E_base   = 150    # annular (base) region
@@ -308,8 +308,8 @@ E_fib    = 37.1    # fibrosa layer
 # Apply exponential decay formula
 P_base  = P_v * np.exp(-k * E_base)
 P_free  = P_v * np.exp(-k * E_free)
-P_ventricularis  = P_v * np.exp(-k * E_vent)
-P_spongiosa = P_v * np.exp(-k * E_spong)
+P_vent  = P_v * np.exp(-k * E_vent)
+P_spong = P_v * np.exp(-k * E_spong)
 P_fibrosa   = P_v * np.exp(-k * E_fib)
 
 class P_v_3D(UserExpression):
@@ -323,11 +323,11 @@ class P_v_3D(UserExpression):
 
     # Z-direction by layer
     if x[2] < z_ventricularis:
-        p_z = P_ventricularis
+        p_z = P_vent
     elif x[2] < z_spongiosa:
-        p_z = P_spongiosa
+        p_z = P_spong
     else:
-        p_z = P_fibrosa
+        p_z = P_fib
 
     # Combined permeability
     value[0] = p_r * p_z
