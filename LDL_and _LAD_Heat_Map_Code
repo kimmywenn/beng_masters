@@ -2,47 +2,13 @@ import numpy as np
 import math
 import pyvista as pv
 
-# === Model parameters ===
-P_v = 1.92e-9              # Base permeability [cm/s]
-k = 1e-4             # Sensitivity to stiffness
-t_leaflet = 0.0694         # Leaflet thickness (cm)
-R = 1.0                    # Radius of leaflet (cm)
-
-
 # Radial and vertical bounds
-r_min, r_max = 0.0, R
-
-# Layer fractions
-f_fib = 0.44
-f_vent = 0.25
-f_spong = 1.0 - f_fib - f_vent
-
-# Layer z cutoffs
-z_ventricularis = f_vent * t_leaflet                        #z_vent = 0 - .017 cm
-z_spongiosa     = f_spong * t_leaflet + z_ventricularis     # z_spon = .017 - .022 cm
-                                                            #z_fib = .022 - .069 cm
-
-[0.1, 0.2, 0.3]
-[0.1, 0.3, 0.5]
-
-# Stiffness in kPa
-E_base   = 150
-E_free   = 42.6
-E_vent   = 26.9
-E_spong  = 15.4
-E_fib    = 37.1
-
-# Exponential decay (precompute)
-P_base  = P_v * np.exp(-k * E_base)
-P_free  = P_v * np.exp(-k * E_free)
-P_vent  = P_v * np.exp(-k * E_vent)
-P_spong = P_v * np.exp(-k * E_spong)
-P_fib   = P_v * np.exp(-k * E_fib)
+r_min, r_max = 0.0, v_radius
 
 # === Discretize space ===
 Nx, Ny, Nz = 100, 100, 100  # theta, radial, z
 theta = np.linspace(0, np.pi, Nx)
-r = np.linspace(0, R, Ny)
+r = np.linspace(0, v_radius, Ny)
 z = np.linspace(0, t_leaflet, Nz)
 
 # Create meshgrid
@@ -81,15 +47,6 @@ w_z = 1.0
 # Combine with Pythagorean formula
 P_field_new = np.sqrt(w_r * p_r**2 + w_z * p_z**2)
 
-# Final permeability field
-# P_field = math.sqrt(p_r * p_r + p_z * p_z)
-
-
-# === Scale for better visualization ===
-# scaling_factor = 1e18
-# P_field_scaled = P_field * scaling_factor
-
-
 # === PyVista 3D structured grid ===
 points = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
 grid = pv.StructuredGrid()
@@ -97,7 +54,6 @@ grid.points = points
 grid.dimensions = [Ny, Nx, Nz]  # [r, θ, z]
 
 # === Plot 3D heatmap of old model ===
-
 plotter = pv.Plotter()
 pmin, pmax = P_field_old.min(), P_field_old.max()
 grid["Permeability"] = P_field_old.ravel()
@@ -124,7 +80,7 @@ points_stretched = np.c_[X.ravel(), Y.ravel(), Z_stretched.ravel()]
 grid.points = points_stretched
 
 
-# === Plot 3D heatmap ===
+# === Plot 3D heatmap of new model (Strecthed) ===
 plotter = pv.Plotter()
 pmin, pmax = P_field_new.min(), P_field_new.max()
 plotter.add_mesh(grid, scalars="Permeability", cmap="gist_rainbow", clim=[pmin, pmax], scalar_bar_args={"title": "Permeability (cm/s)"})
@@ -134,7 +90,6 @@ plotter.show()
 
 
 # === Plot XY slices at different z-levels with stretch ===
-
 # Choose which z-slices to visualize (by index)
 slices_to_plot = [5, 50, 95]  # You can change these values to pick different depths
 
